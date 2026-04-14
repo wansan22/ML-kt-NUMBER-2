@@ -1,0 +1,77 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.datasets import load_wine
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, f1_score, classification_report
+from sklearn.preprocessing import StandardScaler
+
+# 1. Загрузка данных
+wine_data = load_wine()
+X = pd.DataFrame(wine_data.data, columns=wine_data.feature_names)
+y = pd.Series(wine_data.target, name="target")
+
+# Вывод статис  тики в консоль
+print("Статистика данных:")
+print(X.describe())
+print("\nПропуски:\n", X.isnull().sum())
+print("\nРаспределение сортов вина (классов):\n", y.value_counts())
+
+# 2. Визуализация (Исправленная сетка 3x2, чтобы ничего не накладывалось) 3 ряда 2 колонки визуал при открытиии
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12, 12))
+
+# Гистограмма распределения классов (в первой ячейке) создание гистограммы начально
+sns.histplot(y, bins=3, kde=False, ax=axes[0, 0])
+axes[0, 0].set_title("Distribution of classes (0, 1, 2)")
+
+# Цикл для боксплотов (начинаем со второй ячейки, чтобы не было наложения) - цикл для графмков и их расположения
+for i, col in enumerate(X.columns[:4]):
+    pos = i + 1  # Сдвигаем позицию на 1
+    row = pos // 2
+    col_idx = pos % 2
+    sns.boxplot(x=y, y=X[col], ax=axes[row, col_idx])
+    axes[row, col_idx].set_title(f"{col} by class")
+
+# Удаляем пустую шестую ячейку (она нам не нужна)
+fig.delaxes(axes[2, 1])
+
+plt.tight_layout() # для расстояния между
+plt.show() # Сначала закройте это окно, чтобы код пошел дальше! для отображения matlib
+
+# 3. Подготовка данных
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, random_state=42, stratify=y ## это уже библиотека scikit которая создаёт рандом фиксированный для понимания уулчшения модели.
+)
+
+# Масштабирование
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train) # тут берётся масштарбирование относительно других параметров
+X_test_scaled = scaler.transform(X_test)
+
+# 4. Обучение модели
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train_scaled, y_train) # тут 100 деревьв работают с этим
+
+# 5. Оценка результатов
+y_pred = model.predict(X_test_scaled)
+
+accuracy = accuracy_score(y_test, y_pred)
+f1_macro = f1_score(y_test, y_pred, average="macro")
+
+print(f"\nТочность (Accuracy): {accuracy:.4f}")
+print(f"F1-score (macro): {f1_macro:.4f}")
+print("\nПодробный отчет (Classification Report):\n", classification_report(y_test, y_pred))
+
+# 6. Важность признаков (какие химикаты важнее всего для определения сорта)
+feature_importance = pd.DataFrame({
+    "feature": wine_data.feature_names,
+    "importance": model.feature_importances_
+}).sort_values("importance", ascending=False)
+
+plt.figure(figsize=(10, 6))
+sns.barplot(data=feature_importance, x="importance", y="feature", hue="feature", palette="viridis", legend=False)
+plt.title("Feature Importance (Что самое важное для модели?)")
+plt.tight_layout()
+plt.show()
